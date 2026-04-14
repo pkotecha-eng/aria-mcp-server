@@ -8,10 +8,23 @@ A standalone MCP server that gives any Claude agent real-time access to biomedic
 | `search_pubmed` | Search 35M+ peer-reviewed papers via NCBI E-utilities |
 | `search_clinical_trials` | Search 400K+ trials via ClinicalTrials.gov v2 API |
 
-## Resources & Prompts
 
-- **Resource** `info://aria` — server capabilities overview
-- **Prompt** `clinical-research-brief` — reusable prompt template for structured clinical intelligence briefs
+## Prompts
+
+| Prompt | Description |
+|--------|-------------|
+| `clinical-research-brief` | Comprehensive evidence + trial brief for a condition |
+| `adverse-event-analysis` | Structured AE and safety profile for a drug |
+| `trial-eligibility-checker` | Patient eligibility assessment across recruiting trials |
+
+## Resources
+
+| Resource | Description |
+|----------|-------------|
+| `info://aria` | Overview of ARIA capabilities and data sources |
+| `reference://trial-phases` | Phase I–IV definitions and FDA special designations |
+| `reference://high-impact-journals` | Curated high-impact journals by specialty |
+| `reference://fda-databases` | FDA databases for drug, safety, and regulatory research |
 
 ## Example queries
 

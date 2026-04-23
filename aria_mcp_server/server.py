@@ -11,7 +11,7 @@ Usage:
 """
 
 from fastmcp import FastMCP
-from tools import search_pubmed, search_clinical_trials, format_results_for_claude, format_trials_for_claude
+from aria_mcp_server.tools import search_pubmed, search_clinical_trials, format_results_for_claude, format_trials_for_claude
 
 mcp = FastMCP(
     name="aria-clinical-research",
@@ -39,7 +39,7 @@ def search_pubmed(
         query: Search query (e.g. "velarixin pediatric epilepsy phase 2")
         max_results: Number of papers to return (1-10, default 5)
     """
-    from tools import search_pubmed as _search, format_results_for_claude as _fmt
+    from aria_mcp_server.tools import search_pubmed as _search, format_results_for_claude as _fmt
     max_results = max(1, min(max_results, 10))
     papers = _search(query=query, max_results=max_results)
     return _fmt(papers)
@@ -64,7 +64,7 @@ def search_clinical_trials(
         intervention: Optional drug or intervention name to narrow results
         max_results: Number of trials to return (1-10, default 5)
     """
-    from tools import search_clinical_trials as _search, format_trials_for_claude as _fmt
+    from aria_mcp_server.tools import search_clinical_trials as _search, format_trials_for_claude as _fmt
     max_results = max(1, min(max_results, 10))
     trials = _search(
         condition=condition,
@@ -267,11 +267,13 @@ def trial_eligibility_checker(condition: str, patient_profile: str) -> str:
         f"Always remind the user that final eligibility must be confirmed with the trial site."
     )
 
-
-if __name__ == "__main__":
+def run():
     import sys
     transport = "http" if "--transport" in sys.argv and "http" in sys.argv else "stdio"
     if transport == "http":
         mcp.run(transport="http", port=8000)
     else:
         mcp.run(transport="stdio")
+
+if __name__ == "__main__":
+    run()

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aria-mcp-server"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=3.2.4",
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+aria-mcp-server = "aria_mcp_server.server:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aria_mcp_server"]

@@ -1,0 +1,8 @@
+{
+    "name": "aria-mcp-server",
+    "description": "Real-time access to PubMed (35M+ papers) and ClinicalTrials.gov (400K+ trials) for any MCP-compatible client. No API key required.",
+    "install": "pip install aria-mcp-server",
+    "run": "aria-mcp-server",
+    "homepage": "https://github.com/pkotecha-eng/aria-mcp-server",
+    "license": "MIT"
+  }

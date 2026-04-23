@@ -39,10 +39,8 @@ Once connected, ask Claude:
 ## Quickstart
 
 ```bash
-git clone https://github.com/pkotecha-eng/aria-mcp-server
-cd aria-mcp-server
-pip install -r requirements.txt
-python3 server.py
+pip install aria-mcp-server
+aria-mcp-server
 ```
 
 ## Connect to Claude Desktop
@@ -53,8 +51,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "aria-clinical-research": {
-      "command": "python3",
-      "args": ["/absolute/path/to/aria-mcp-server/server.py"]
+      "command": "aria-mcp-server"
     }
   }
 }
@@ -78,6 +75,22 @@ Restart Claude Desktop. The server will appear under Settings → Developer → 
 - Clinical trial coordinators checking eligibility and recruiting status
 - Drug discovery teams cross-referencing published evidence with active trials
 - Any Claude agent needing grounded biomedical knowledge
+
+
+## Project Structure
+
+```
+aria-mcp-server/          ← root, where mcp-publisher runs
+├── aria_mcp_server/      ← Python package
+│   ├── __init__.py
+│   ├── server.py
+│   └── tools.py
+├── server.json           ← MCP registry metadata
+├── pyproject.toml
+├── README.md
+├── LICENSE
+└── glama.json
+```
 
 ## Built by
 

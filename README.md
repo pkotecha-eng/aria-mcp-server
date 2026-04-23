@@ -1,4 +1,4 @@
-<!-- mcp-name: aria-mcp-server -->
+<!-- mcp-name: io.github.pkotecha-eng/aria-mcp-server -->
 
 # 🧬 ARIA Clinical Research MCP Server
 A standalone MCP server that gives any Claude agent real-time access to biomedical literature and clinical trials — no API keys required.

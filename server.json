@@ -6,12 +6,12 @@
     "url": "https://github.com/pkotecha-eng/aria-mcp-server",
     "source": "github"
   },
-  "version": "0.1.2",
+  "version": "0.1.4",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "aria-mcp-server",
-      "version": "0.1.2",
+      "version": "0.1.4",
       "transport": {
         "type": "stdio"
       }

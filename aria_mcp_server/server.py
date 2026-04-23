@@ -38,6 +38,16 @@ def search_pubmed(
     Args:
         query: Search query (e.g. "velarixin pediatric epilepsy phase 2")
         max_results: Number of papers to return (1-10, default 5)
+
+    Returns:
+        Formatted string with title, authors, journal, year, PMID, and abstract
+        for each paper. Returns a "no results" message if nothing is found.
+        Handles API errors gracefully with descriptive error messages.
+
+    Notes:
+        - Results are sorted by relevance
+        - max_results is clamped to 1-10 regardless of input
+        - Requires no API key; uses NCBI E-utilities public API
     """
     from aria_mcp_server.tools import search_pubmed as _search, format_results_for_claude as _fmt
     max_results = max(1, min(max_results, 10))
@@ -63,6 +73,18 @@ def search_clinical_trials(
         status: Trial status — RECRUITING, COMPLETED, or ALL (default: RECRUITING)
         intervention: Optional drug or intervention name to narrow results
         max_results: Number of trials to return (1-10, default 5)
+    
+    Returns:
+        Formatted string with NCT ID, title, phase, status, sponsor, conditions,
+        interventions, and eligibility criteria for each trial.
+        Returns a "no results" message if nothing is found.
+        Handles API errors gracefully with descriptive error messages.
+    
+    Notes:
+        - status defaults to RECRUITING if not specified
+        - intervention is optional and narrows results when provided
+        - max_results is clamped to 1-10 regardless of input
+        - Requires no API key; uses ClinicalTrials.gov v2 public API
     """
     from aria_mcp_server.tools import search_clinical_trials as _search, format_trials_for_claude as _fmt
     max_results = max(1, min(max_results, 10))

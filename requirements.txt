@@ -1,4 +1,0 @@
-fastmcp
-httpx
-requests
-xmltodict

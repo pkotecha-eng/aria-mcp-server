@@ -11,6 +11,7 @@ Usage:
 """
 
 from fastmcp import FastMCP
+from typing import Annotated
 from aria_mcp_server.tools import search_pubmed, search_clinical_trials, format_results_for_claude, format_trials_for_claude
 
 mcp = FastMCP(
@@ -26,9 +27,9 @@ mcp = FastMCP(
 
 @mcp.tool
 def search_pubmed(
-    query: str,
-    max_results: int = 5,
-) -> str:
+    query: Annotated[str, "Search query e.g. 'velarixin pediatric epilepsy phase 2'"],
+    max_results: Annotated[int, "Number of papers to return, between 1 and 10"] = 5,
+) -> Annotated[str, "Formatted list of papers with title, authors, journal, year, PMID, and abstract. Returns 'no results' message if nothing found."]:
     """
     Search PubMed for peer-reviewed biomedical literature.
 
@@ -57,11 +58,11 @@ def search_pubmed(
 
 @mcp.tool
 def search_clinical_trials(
-    condition: str,
-    status: str = "RECRUITING",
-    intervention: str = "",
-    max_results: int = 5,
-) -> str:
+    condition: Annotated[str, "Disease or condition e.g. 'pediatric epilepsy', 'lung cancer'"],
+    status: Annotated[str, "Trial status: RECRUITING, COMPLETED, or ALL"] = "RECRUITING",
+    intervention: Annotated[str, "Optional drug or intervention name to narrow results"] = "",
+    max_results: Annotated[int, "Number of trials to return, between 1 and 10"] = 5,
+) -> Annotated[str, "Formatted list of trials with NCT ID, title, phase, status, sponsor, conditions, interventions, and eligibility criteria. Returns 'no results' message if nothing found."]:
     """
     Search ClinicalTrials.gov for clinical studies.
 

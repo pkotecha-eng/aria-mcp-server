@@ -24,12 +24,22 @@ mcp = FastMCP(
     ),
 )
 
-
-@mcp.tool
+@mcp.tool(
+    output_schema={
+        "type": "object",
+        "properties": {
+            "result": {
+                "type": "string",
+                "description": "Formatted list of papers with title, authors, journal, year, PMID, and abstract. Returns 'no results' message if nothing found."
+            }
+        },
+        "required": ["result"]
+    }
+)
 def search_pubmed(
     query: Annotated[str, "Search query e.g. 'velarixin pediatric epilepsy phase 2'"],
     max_results: Annotated[int, "Number of papers to return, between 1 and 10"] = 5,
-) -> Annotated[str, "Formatted list of papers with title, authors, journal, year, PMID, and abstract. Returns 'no results' message if nothing found."]:
+) -> str:
     """
     Search PubMed for peer-reviewed biomedical literature.
 
@@ -56,13 +66,26 @@ def search_pubmed(
     return _fmt(papers)
 
 
+@mcp.tool(
+    output_schema={
+        "type": "object",
+        "properties": {
+            "result": {
+                "type": "string",
+                "description": "Formatted list of trials with NCT ID, title, phase, status, sponsor, conditions, interventions, and eligibility criteria. Returns 'no results' message if nothing found."
+            }
+        },
+        "required": ["result"]
+    }
+)
+
 @mcp.tool
 def search_clinical_trials(
     condition: Annotated[str, "Disease or condition e.g. 'pediatric epilepsy', 'lung cancer'"],
     status: Annotated[str, "Trial status: RECRUITING, COMPLETED, or ALL"] = "RECRUITING",
     intervention: Annotated[str, "Optional drug or intervention name to narrow results"] = "",
     max_results: Annotated[int, "Number of trials to return, between 1 and 10"] = 5,
-) -> Annotated[str, "Formatted list of trials with NCT ID, title, phase, status, sponsor, conditions, interventions, and eligibility criteria. Returns 'no results' message if nothing found."]:
+) -> str:
     """
     Search ClinicalTrials.gov for clinical studies.
 

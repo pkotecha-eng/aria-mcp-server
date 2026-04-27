@@ -25,6 +25,15 @@ mcp = FastMCP(
 )
 
 @mcp.tool(
+    description=(
+        "Search PubMed for peer-reviewed biomedical literature. "
+        "Read-only operation. No authentication required. "
+        "Uses NCBI E-utilities public API (rate limit: ~3 requests/sec). "
+        "Returns up to 10 results per call. No pagination. "
+        "Returns 'No papers found.' if no results match. "
+        "Use for: research papers, drug mechanisms, clinical outcomes, disease studies, "
+        "safety/efficacy data, biomarkers, diagnostics, and any scientific question."
+    ),
     output_schema={
         "type": "object",
         "properties": {
@@ -67,6 +76,15 @@ def search_pubmed(
 
 
 @mcp.tool(
+    description=(
+        "Search ClinicalTrials.gov for clinical studies. "
+        "Read-only operation. No authentication required. "
+        "Uses ClinicalTrials.gov v2 public API (no rate limit documented). "
+        "Returns up to 10 results per call. No pagination. "
+        "Returns 'No clinical trials found.' if no results match. "
+        "Use for: active trials, recruiting studies, eligibility criteria, "
+        "phase information, sponsor details, and trial locations."
+    ),
     output_schema={
         "type": "object",
         "properties": {
@@ -79,7 +97,6 @@ def search_pubmed(
     }
 )
 
-@mcp.tool
 def search_clinical_trials(
     condition: Annotated[str, "Disease or condition e.g. 'pediatric epilepsy', 'lung cancer'"],
     status: Annotated[str, "Trial status: RECRUITING, COMPLETED, or ALL"] = "RECRUITING",

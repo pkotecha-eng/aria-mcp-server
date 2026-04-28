@@ -1,0 +1,4 @@
+fastmcp>=3.2.4
+httpx>=0.28.1
+requests>=2.31.0
+xmltodict>=0.14.2

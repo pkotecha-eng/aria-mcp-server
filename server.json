@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.pkotecha-eng/aria-mcp-server",
-  "description": "Search 35M+ PubMed papers & 400K+ clinical trials. Includes prompts and research tools. No API key.",
+  "description": "Search 35M+ PubMed, 400K+ ClinicalTrials.gov & ISRCTN trials. Prompts included. No API key.",
   "repository": {
     "url": "https://github.com/pkotecha-eng/aria-mcp-server",
     "source": "github"
   },
-  "version": "0.1.7",
+  "version": "0.1.8",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "aria-mcp-server",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "transport": {
         "type": "stdio"
       }

@@ -197,6 +197,20 @@ def _parse_trial(study: dict) -> dict | None:
         conditions_mod = proto.get("conditionsModule") or {}
         interventions_mod = proto.get("armsInterventionsModule") or {}
         contacts_mod = proto.get("contactsLocationsModule") or {}
+        outcomes_mod = proto.get("outcomesModule") or {}
+
+        primary_outcomes = outcomes_mod.get("primaryOutcomes") or []
+        primary_outcome = primary_outcomes[0].get("measure", "") if primary_outcomes else ""
+        if len(primary_outcome) > 300:
+          primary_outcome = primary_outcome[:297] + "..."
+
+        secondary_outcomes_list = outcomes_mod.get("secondaryOutcomes") or []
+        secondary_outcome_strs = [
+          o.get("measure", "") for o in secondary_outcomes_list[:3] if isinstance(o, dict)
+        ]
+        secondary_outcome = "; ".join(secondary_outcome_strs)
+        if len(secondary_outcome) > 300:
+          secondary_outcome = secondary_outcome[:297] + "..."
 
         nct_id = _ct_get(id_mod, "nctId")
         if not nct_id:
@@ -240,6 +254,8 @@ def _parse_trial(study: dict) -> dict | None:
             "start_date": _ct_get(status_mod, "startDateStruct", "date"),
             "locations": location_strs,
             "url": f"https://clinicaltrials.gov/study/{nct_id}",
+            "primary_outcome": primary_outcome,
+            "secondary_outcomes": secondary_outcome,
         }
     except (KeyError, TypeError, AttributeError):
         return None
@@ -298,6 +314,8 @@ def format_trials_for_claude(trials: list[dict]) -> str:
             f"Sex: {t.get('sex') or 'N/A'}",
             f"Locations: {locations_str}",
             f"Summary: {t.get('brief_summary') or 'N/A'}",
+            f"Primary Outcome: {t.get('primary_outcome') or 'N/A'}",
+            f"Secondary Outcomes: {t.get('secondary_outcomes') or 'N/A'}",
             f"Eligibility: {t.get('eligibility_criteria') or 'N/A'}",
             f"URL: {t.get('url') or 'N/A'}",
             "",
@@ -305,7 +323,125 @@ def format_trials_for_claude(trials: list[dict]) -> str:
     return "\n".join(lines).strip()
 
 
+# -------------------------------------------------------------------------
+# ISRCTN Registry (UK/European clinical trials)
+# -------------------------------------------------------------------------
+
+ISRCTN_BASE = "https://www.isrctn.com/api/query/format/who"
+
+def _is_relevant_isrctn(trial: dict, query: str) -> bool:
+    """Check if query terms appear in title or condition — not full document."""
+    query_words = set(query.lower().split())
+    main = trial.get("main") or {}
+    searchable = " ".join([
+        _get_text(main.get("public_title")),
+        _get_text(main.get("hc_freetext")),
+    ]).lower()
+    return all(word in searchable for word in query_words)
+
+
+def _parse_isrctn_trial(trial: dict) -> dict | None:
+    try:
+        main = trial.get("main") or {}
+        criteria = trial.get("criteria") or {}
+        countries_el = trial.get("countries") or {}
+
+        trial_id = _get_text(main.get("trial_id"))
+        if not trial_id:
+            return None
+
+        # Handle countries — could be string or list
+        country_raw = countries_el.get("country2")
+        if isinstance(country_raw, list):
+            countries = [c for c in country_raw if c]
+        elif country_raw:
+            countries = [country_raw]
+        else:
+            countries = []
+
+        inclusion = _get_text(criteria.get("inclusion_criteria"))
+        exclusion = _get_text(criteria.get("exclusion_criteria"))
+        eligibility = ""
+        if inclusion:
+            eligibility += f"Inclusion: {inclusion[:300]}..."
+        if exclusion:
+            eligibility += f"\nExclusion: {exclusion[:300]}..."
+
+        return {
+            "trial_id": trial_id,
+            "title": _get_text(main.get("public_title")),
+            "status": _get_text(main.get("recruitment_status")),
+            "phase": _get_text(main.get("phase")),
+            "sponsor": _get_text(main.get("primary_sponsor")),
+            "condition": _get_text(main.get("hc_freetext")),
+            "primary_outcome": _get_text(trial.get("primary_outcome", {}).get("prim_outcome"))[:300] + "..." if _get_text(trial.get("primary_outcome", {}).get("prim_outcome")) else "",
+            "secondary_outcomes": _get_text(trial.get("secondary_outcome", {}).get("sec_outcome"))[:300] + "..." if _get_text(trial.get("secondary_outcome", {}).get("sec_outcome")) else "",
+            "countries": countries,
+            "min_age": _get_text(criteria.get("agemin")),
+            "max_age": _get_text(criteria.get("agemax")),
+            "gender": _get_text(criteria.get("gender")),
+            "eligibility_criteria": eligibility,
+            "url": _get_text(main.get("url")),
+        }
+    except (KeyError, TypeError, AttributeError):
+        return None
+
+
+def search_isrctn(query: str, max_results: int = 5) -> list[dict]:
+    """Search ISRCTN registry for UK/European clinical trials. No API key required."""
+    query = (query or "").strip()
+    if not query:
+        return []
+    max_results = max(1, min(max_results, 20))
+    try:
+        r = requests.get(
+            ISRCTN_BASE,
+            params={"q": query, "limit": max_results},
+            timeout=15,
+        )
+        r.raise_for_status()
+        data = xmltodict.parse(r.content)
+    except Exception as e:
+        raise RuntimeError(f"ISRCTN search failed: {e}") from e
+
+    trials_el = (data.get("trials") or {}).get("trial")
+    if not trials_el:
+        return []
+    if isinstance(trials_el, dict):
+        trials_el = [trials_el]
+
+    relevant = [tr for tr in trials_el if _is_relevant_isrctn(tr, query)]
+    return [t for t in (_parse_isrctn_trial(tr) for tr in relevant) if t]
+
+
+def format_isrctn_for_claude(trials: list[dict]) -> str:
+    """Format ISRCTN results as readable text."""
+    if not trials:
+        return "No ISRCTN trials found matching those criteria."
+    lines = []
+    for i, t in enumerate(trials, 1):
+        countries_str = "; ".join(t.get("countries") or []) or "N/A"
+        lines.append("\n".join([
+            f"[ISRCTN Trial {i}]",
+            f"ISRCTN ID: {t.get('trial_id') or 'N/A'}",
+            f"Title: {t.get('title') or 'N/A'}",
+            f"Status: {t.get('status') or 'N/A'}",
+            f"Phase: {t.get('phase') or 'N/A'}",
+            f"Condition: {t.get('condition') or 'N/A'}",
+            f"Primary Outcome: {t.get('primary_outcome') or 'N/A'}",
+            f"Secondary Outcomes: {t.get('secondary_outcomes') or 'N/A'}",
+            f"Sponsor: {t.get('sponsor') or 'N/A'}",
+            f"Countries: {countries_str}",
+            f"Age Range: {t.get('min_age') or 'N/A'} – {t.get('max_age') or 'N/A'}",
+            f"Gender: {t.get('gender') or 'N/A'}",
+            f"Eligibility: {t.get('eligibility_criteria') or 'N/A'}",
+            f"URL: {t.get('url') or 'N/A'}",
+            "",
+        ]))
+    return "\n".join(lines).strip()
+
 __all__ = [
     "search_pubmed", "format_results_for_claude",
     "search_clinical_trials", "format_trials_for_claude",
+    "search_isrctn", "format_isrctn_for_claude",
 ]

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.8] - 2026-05-03
+### Added
+- `search_isrctn` tool: UK/European clinical trials via ISRCTN registry (no API key required)
+- Primary and secondary outcomes fields for both ClinicalTrials.gov and ISRCTN results
+- Relevance filtering for ISRCTN results (query terms must appear in title or condition)
+
 ## [0.1.7] - 2026-04-28
 - Add behavioral disclosure to tool descriptions (rate limits, auth, pagination)
 - Add output_schema descriptions for improved tool definition quality

@@ -9,6 +9,7 @@ A standalone MCP server that gives any Claude agent real-time access to biomedic
 |------|-------------|
 | `search_pubmed` | Search 35M+ peer-reviewed papers via NCBI E-utilities |
 | `search_clinical_trials` | Search 400K+ trials via ClinicalTrials.gov v2 API |
+| `search_isrctn` | Search UK/European trials via ISRCTN registry |
 
 
 ## Prompts
@@ -35,6 +36,7 @@ Once connected, ask Claude:
 - "Search PubMed for ketogenic diet pediatric epilepsy outcomes"
 - "Find recruiting trials for lung cancer immunotherapy"
 - "What does the literature say about veliparib in ovarian cancer, and are there active trials?"
+- "Find UK and European trials for pediatric epilepsy via ISRCTN"
 
 ## Quickstart
 
@@ -63,6 +65,7 @@ Restart Claude Desktop. The server will appear under Settings → Developer → 
 
 - **PubMed** — NCBI E-utilities (public API, no key required)
 - **ClinicalTrials.gov** — v2 REST API (public API, no key required)
+- **ISRCTN** — UK/European clinical trials registry (public API, no key required)
 
 ## Tech stack
 

@@ -1,9 +1,10 @@
 """
 ARIA Clinical Research MCP Server
 
-Exposes two tools to any MCP-compatible client:
+Exposes three tools to any MCP-compatible client:
   - search_pubmed: Search 35M+ biomedical papers via NCBI E-utilities
   - search_clinical_trials: Search 400K+ trials via ClinicalTrials.gov v2 API
+  - search_isrctn: Search UK/European trials via ISRCTN registry
 
 Usage:
   python server.py                    # stdio (Claude Desktop)
@@ -12,7 +13,10 @@ Usage:
 
 from fastmcp import FastMCP
 from typing import Annotated
-from aria_mcp_server.tools import search_pubmed, search_clinical_trials, format_results_for_claude, format_trials_for_claude
+from aria_mcp_server.tools import (
+    search_pubmed, search_clinical_trials, format_results_for_claude, format_trials_for_claude,
+    search_isrctn, format_isrctn_for_claude
+)
 
 mcp = FastMCP(
     name="aria-clinical-research",
@@ -20,7 +24,8 @@ mcp = FastMCP(
         "ARIA provides real-time access to biomedical literature and clinical trials. "
         "Use search_pubmed for published research, mechanisms, drug studies, and outcomes. "
         "Use search_clinical_trials for active or completed trials, eligibility criteria, and recruiting studies. "
-        "Use both together for comprehensive clinical intelligence on any condition or intervention."
+        "Use search_isrctn for UK and European clinical trials not listed on ClinicalTrials.gov. "
+        "Use all three together for comprehensive global clinical intelligence on any condition or intervention."
     ),
 )
 
@@ -138,6 +143,57 @@ def search_clinical_trials(
     return _fmt(trials)
 
 
+@mcp.tool(
+    description=(
+        "Search the ISRCTN registry for UK and European clinical trials. "
+        "Read-only operation. No authentication required. "
+        "Complements ClinicalTrials.gov by covering trials at UK academic institutions "
+        "and European research centers not listed on ClinicalTrials.gov. "
+        "Returns up to 10 results per call, filtered for relevance. "
+        "Returns 'No ISRCTN trials found.' if no results match. "
+        "Use for: UK/European trials, academic institution studies, "
+        "international coverage beyond ClinicalTrials.gov."
+    ),
+    output_schema={
+        "type": "object",
+        "properties": {
+            "result": {
+                "type": "string",
+                "description": "Formatted list of trials with ISRCTN ID, title, phase, status, sponsor, condition, outcomes, countries, and eligibility criteria."
+            }
+        },
+        "required": ["result"]
+    }
+)
+def search_isrctn(
+    query: Annotated[str, "Condition or search terms e.g. 'pediatric epilepsy', 'type 2 diabetes'"],
+    max_results: Annotated[int, "Number of trials to return, between 1 and 10"] = 5,
+) -> str:
+    """
+    Search the ISRCTN registry for UK and European clinical trials.
+
+    Use for: UK/European trials, academic institution studies, and international
+    coverage beyond ClinicalTrials.gov.
+
+    Args:
+        query: Condition or search terms (e.g. "pediatric epilepsy")
+        max_results: Number of trials to return (1-10, default 5)
+
+    Returns:
+        Formatted string with ISRCTN ID, title, phase, status, sponsor, condition,
+        primary/secondary outcomes, countries, age range, and eligibility criteria.
+        Returns a "no results" message if nothing is found.
+
+    Notes:
+        - Results are filtered for relevance — query terms must appear in title or condition
+        - Requires no API key; uses ISRCTN public WHO-format API
+        - Covers UK, European, and some international academic institution trials
+    """
+    from aria_mcp_server.tools import search_isrctn as _search, format_isrctn_for_claude as _fmt
+    max_results = max(1, min(max_results, 10))
+    trials = _search(query=query, max_results=max_results)
+    return _fmt(trials)
+  
 @mcp.resource("info://aria")
 def aria_info() -> str:
     """Overview of ARIA's capabilities and data sources."""
@@ -147,6 +203,8 @@ ARIA Clinical Research MCP Server
 Tools:
   - search_pubmed: 35M+ papers from NCBI PubMed (no API key required)
   - search_clinical_trials: 400K+ trials from ClinicalTrials.gov v2 (no API key required)
+  - search_isrctn: UK/European trials from ISRCTN registry (no API key required)
+
 
 Best used for:
   - Life sciences researchers needing real-time literature access

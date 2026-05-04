@@ -337,8 +337,10 @@ def _is_relevant_isrctn(trial: dict, query: str) -> bool:
         _get_text(main.get("public_title")),
         _get_text(main.get("hc_freetext")),
     ]).lower()
-    return all(word in searchable for word in query_words)
-
+    significant_words = [w for w in query_words if len(w) > 3]
+    if not significant_words:
+      return True
+    return any(word in searchable for word in significant_words)
 
 def _parse_isrctn_trial(trial: dict) -> dict | None:
     try:

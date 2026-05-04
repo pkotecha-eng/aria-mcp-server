@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.9] - 2026-05-04
+### Fixed
+- Relaxed ISRCTN relevance filter from `all()` to `any()` on significant words (>3 chars) — improves recall for medical conditions with synonyms (e.g. "beta thalassemia" now matches "thalassemia major")
+
 ## [0.1.8] - 2026-05-03
 ### Added
 - `search_isrctn` tool: UK/European clinical trials via ISRCTN registry (no API key required)

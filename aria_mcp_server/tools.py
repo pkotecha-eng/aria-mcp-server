@@ -230,9 +230,12 @@ def _parse_trial(study: dict) -> dict | None:
             if loc_str:
                 location_strs.append(loc_str)
 
-        criteria = _ct_get(elig_mod, "eligibilityCriteria")
-        if len(criteria) > 600:
-            criteria = criteria[:597] + "..."
+        criteria_raw = _ct_get(elig_mod, "eligibilityCriteria")
+        criteria_parts = criteria_raw.split("Exclusion Criteria:")
+        inclusion_text = criteria_parts[0].replace("Inclusion Criteria:", "").strip()
+        inclusion_criteria = inclusion_text[:597] + "..." if len(inclusion_text) > 600 else inclusion_text
+        exclusion_text = criteria_parts[1].strip() if len(criteria_parts) > 1 else ""
+        exclusion_criteria = exclusion_text[:797] + "..." if len(exclusion_text) > 800 else exclusion_text
 
         summary = _ct_get(desc_mod, "briefSummary")
         if len(summary) > 400:
@@ -246,7 +249,8 @@ def _parse_trial(study: dict) -> dict | None:
             "conditions": "; ".join(conditions_mod.get("conditions") or []),
             "interventions": intervention_names,
             "brief_summary": summary,
-            "eligibility_criteria": criteria,
+            "inclusion_criteria": inclusion_criteria,
+            "exclusion_criteria": exclusion_criteria,
             "min_age": _ct_get(elig_mod, "minimumAge"),
             "max_age": _ct_get(elig_mod, "maximumAge"),
             "sex": _ct_get(elig_mod, "sex"),
@@ -316,7 +320,8 @@ def format_trials_for_claude(trials: list[dict]) -> str:
             f"Summary: {t.get('brief_summary') or 'N/A'}",
             f"Primary Outcome: {t.get('primary_outcome') or 'N/A'}",
             f"Secondary Outcomes: {t.get('secondary_outcomes') or 'N/A'}",
-            f"Eligibility: {t.get('eligibility_criteria') or 'N/A'}",
+            f"Inclusion Criteria: {t.get('inclusion_criteria') or 'N/A'}",
+            f"Exclusion Criteria: {t.get('exclusion_criteria') or 'N/A'}",
             f"URL: {t.get('url') or 'N/A'}",
             "",
         ]))
@@ -361,13 +366,17 @@ def _parse_isrctn_trial(trial: dict) -> dict | None:
         else:
             countries = []
 
-        inclusion = _get_text(criteria.get("inclusion_criteria"))
-        exclusion = _get_text(criteria.get("exclusion_criteria"))
-        eligibility = ""
-        if inclusion:
-            eligibility += f"Inclusion: {inclusion[:300]}..."
-        if exclusion:
-            eligibility += f"\nExclusion: {exclusion[:300]}..."
+        inclusion_raw = _get_text(criteria.get("inclusion_criteria"))
+        inclusion_criteria = inclusion_raw[:597] + "..." if len(inclusion_raw) > 600 else inclusion_raw
+
+        exclusion_raw = _get_text(criteria.get("exclusion_criteria"))
+        exclusion_criteria = exclusion_raw[:797] + "..." if len(exclusion_raw) > 800 else exclusion_raw
+
+        primary_outcome_raw = _get_text(trial.get("primary_outcome", {}).get("prim_outcome"))
+        primary_outcome = primary_outcome_raw[:297] + "..." if len(primary_outcome_raw) > 300 else primary_outcome_raw
+
+        secondary_outcome_raw = _get_text(trial.get("secondary_outcome", {}).get("sec_outcome"))
+        secondary_outcome = secondary_outcome_raw[:297] + "..." if len(secondary_outcome_raw) > 300 else secondary_outcome_raw
 
         return {
             "trial_id": trial_id,
@@ -376,13 +385,14 @@ def _parse_isrctn_trial(trial: dict) -> dict | None:
             "phase": _get_text(main.get("phase")),
             "sponsor": _get_text(main.get("primary_sponsor")),
             "condition": _get_text(main.get("hc_freetext")),
-            "primary_outcome": _get_text(trial.get("primary_outcome", {}).get("prim_outcome"))[:300] + "..." if _get_text(trial.get("primary_outcome", {}).get("prim_outcome")) else "",
-            "secondary_outcomes": _get_text(trial.get("secondary_outcome", {}).get("sec_outcome"))[:300] + "..." if _get_text(trial.get("secondary_outcome", {}).get("sec_outcome")) else "",
+            "primary_outcome": primary_outcome,
+            "secondary_outcomes": secondary_outcome,
             "countries": countries,
             "min_age": _get_text(criteria.get("agemin")),
             "max_age": _get_text(criteria.get("agemax")),
             "gender": _get_text(criteria.get("gender")),
-            "eligibility_criteria": eligibility,
+            "inclusion_criteria": inclusion_criteria,
+            "exclusion_criteria": exclusion_criteria,
             "url": _get_text(main.get("url")),
         }
     except (KeyError, TypeError, AttributeError):
@@ -436,7 +446,8 @@ def format_isrctn_for_claude(trials: list[dict]) -> str:
             f"Countries: {countries_str}",
             f"Age Range: {t.get('min_age') or 'N/A'} – {t.get('max_age') or 'N/A'}",
             f"Gender: {t.get('gender') or 'N/A'}",
-            f"Eligibility: {t.get('eligibility_criteria') or 'N/A'}",
+            f"Inclusion Criteria: {t.get('inclusion_criteria') or 'N/A'}",
+            f"Exclusion Criteria: {t.get('exclusion_criteria') or 'N/A'}",
             f"URL: {t.get('url') or 'N/A'}",
             "",
         ]))

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0] - 2026-07-12
+
+### Breaking
+- `eligibility_criteria` field split into `inclusion_criteria` (600 char cap) and `exclusion_criteria` (800 char cap) on `search_clinical_trials` and `search_isrctn`
+- Tool inputs now validated via Pydantic `Field` constraints — previously-accepted out-of-range values (`max_results` outside 1-10, invalid `status` literal, empty `query`/`condition`) now raise a `ValidationError` instead of being silently passed through or clamped
+
+### Fixed
+- `structured_content` was broken for all three tools — `output_schema` declared a dict but tool functions returned raw strings, causing `ToolError` for any MCP client enforcing the schema
+- ISRCTN exclusion criteria was never reliably surfacing due to a flawed combined-string parse; now reads `inclusion_criteria`/`exclusion_criteria` directly from separate upstream fields, mirroring the CT.gov structure
+- ISRCTN `primary_outcome`/`secondary_outcomes` always appended `"..."` regardless of whether truncation occurred (present since v0.1.8) — now conditional, matching the pattern already used elsewhere in the file
+- Truncated `inclusion_criteria`/`exclusion_criteria` fields (both CT.gov and ISRCTN) now signal truncation with `"..."` only when content is actually cut, instead of silently ending mid-sentence at the char cap
+
+### Changed
+- Removed dead `max_results` clamp logic in `server.py` — redundant with Pydantic's `Field(ge=1, le=10)` validation, which already rejects out-of-range values before the function body runs
+- Docstrings corrected: `max_results` behavior now described as "rejected" rather than "clamped"
+
+### Removed
+- `httpx` dependency (declared since v0.1.0, never actually imported or used anywhere in the codebase — `requests` has been the real HTTP client throughout)
+
 ## [0.1.9] - 2026-05-04
 ### Fixed
 - Relaxed ISRCTN relevance filter from `all()` to `any()` on significant words (>3 chars) — improves recall for medical conditions with synonyms (e.g. "beta thalassemia" now matches "thalassemia major")

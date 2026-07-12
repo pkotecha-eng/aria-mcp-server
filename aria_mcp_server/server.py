@@ -12,10 +12,15 @@ Usage:
 """
 
 from fastmcp import FastMCP
-from typing import Annotated
+from typing import Annotated, Literal
+from pydantic import Field
 from aria_mcp_server.tools import (
-    search_pubmed, search_clinical_trials, format_results_for_claude, format_trials_for_claude,
-    search_isrctn, format_isrctn_for_claude
+    search_pubmed as _raw_search_pubmed,
+    format_results_for_claude as _fmt_pubmed,
+    search_clinical_trials as _raw_search_clinical_trials,
+    format_trials_for_claude as _fmt_trials,
+    search_isrctn as _raw_search_isrctn,
+    format_isrctn_for_claude as _fmt_isrctn,
 )
 
 mcp = FastMCP(
@@ -51,9 +56,9 @@ mcp = FastMCP(
     }
 )
 def search_pubmed(
-    query: Annotated[str, "Search query e.g. 'velarixin pediatric epilepsy phase 2'"],
-    max_results: Annotated[int, "Number of papers to return, between 1 and 10"] = 5,
-) -> str:
+    query: Annotated[str, Field(min_length=1, description="Search query e.g. 'velarixin pediatric epilepsy phase 2'")],
+    max_results: Annotated[int, Field(ge=1, le=10, description="Number of papers to return, between 1 and 10")] = 5,
+) -> dict:
     """
     Search PubMed for peer-reviewed biomedical literature.
 
@@ -71,13 +76,11 @@ def search_pubmed(
 
     Notes:
         - Results are sorted by relevance
-        - max_results is clamped to 1-10 regardless of input
+        - max_results outside 1-10 is rejected with a validation error
         - Requires no API key; uses NCBI E-utilities public API
     """
-    from aria_mcp_server.tools import search_pubmed as _search, format_results_for_claude as _fmt
-    max_results = max(1, min(max_results, 10))
-    papers = _search(query=query, max_results=max_results)
-    return _fmt(papers)
+    papers = _raw_search_pubmed(query=query, max_results=max_results)
+    return {"result": _fmt_pubmed(papers)}
 
 
 @mcp.tool(
@@ -103,11 +106,11 @@ def search_pubmed(
 )
 
 def search_clinical_trials(
-    condition: Annotated[str, "Disease or condition e.g. 'pediatric epilepsy', 'lung cancer'"],
-    status: Annotated[str, "Trial status: RECRUITING, COMPLETED, or ALL"] = "RECRUITING",
-    intervention: Annotated[str, "Optional drug or intervention name to narrow results"] = "",
-    max_results: Annotated[int, "Number of trials to return, between 1 and 10"] = 5,
-) -> str:
+    condition: Annotated[str, Field(min_length=1, description="Disease or condition e.g. 'pediatric epilepsy', 'lung cancer'")],
+    status: Annotated[Literal["RECRUITING", "COMPLETED", "ALL"], Field(description="Trial status: RECRUITING, COMPLETED, or ALL")] = "RECRUITING",
+    intervention: Annotated[str, Field(description="Optional drug or intervention name to narrow results")] = "",
+    max_results: Annotated[int, Field(ge=1, le=10, description="Number of trials to return, between 1 and 10")] = 5,
+) -> dict:
     """
     Search ClinicalTrials.gov for clinical studies.
 
@@ -129,18 +132,16 @@ def search_clinical_trials(
     Notes:
         - status defaults to RECRUITING if not specified
         - intervention is optional and narrows results when provided
-        - max_results is clamped to 1-10 regardless of input
+        - max_results outside 1-10 is rejected with a validation error
         - Requires no API key; uses ClinicalTrials.gov v2 public API
     """
-    from aria_mcp_server.tools import search_clinical_trials as _search, format_trials_for_claude as _fmt
-    max_results = max(1, min(max_results, 10))
-    trials = _search(
+    trials = _raw_search_clinical_trials(
         condition=condition,
         status=status,
         intervention=intervention,
         max_results=max_results,
     )
-    return _fmt(trials)
+    return {"result": _fmt_trials(trials)}
 
 
 @mcp.tool(
@@ -159,16 +160,16 @@ def search_clinical_trials(
         "properties": {
             "result": {
                 "type": "string",
-                "description": "Formatted list of trials with ISRCTN ID, title, phase, status, sponsor, condition, outcomes, countries, and eligibility criteria."
+                "description": "Formatted list of trials with ISRCTN ID, title, phase, status, sponsor, condition, outcomes, countries, and inclusion/exclusion criteria."
             }
         },
         "required": ["result"]
     }
 )
 def search_isrctn(
-    query: Annotated[str, "Condition or search terms e.g. 'pediatric epilepsy', 'type 2 diabetes'"],
-    max_results: Annotated[int, "Number of trials to return, between 1 and 10"] = 5,
-) -> str:
+    query: Annotated[str, Field(min_length=1, description="Condition or search terms e.g. 'pediatric epilepsy', 'type 2 diabetes'")],
+    max_results: Annotated[int, Field(ge=1, le=10, description="Number of trials to return, between 1 and 10")] = 5,
+) -> dict:
     """
     Search the ISRCTN registry for UK and European clinical trials.
 
@@ -181,7 +182,7 @@ def search_isrctn(
 
     Returns:
         Formatted string with ISRCTN ID, title, phase, status, sponsor, condition,
-        primary/secondary outcomes, countries, age range, and eligibility criteria.
+        primary/secondary outcomes, countries, age range, and inclusion/exclusion criteria.
         Returns a "no results" message if nothing is found.
 
     Notes:
@@ -189,10 +190,8 @@ def search_isrctn(
         - Requires no API key; uses ISRCTN public WHO-format API
         - Covers UK, European, and some international academic institution trials
     """
-    from aria_mcp_server.tools import search_isrctn as _search, format_isrctn_for_claude as _fmt
-    max_results = max(1, min(max_results, 10))
-    trials = _search(query=query, max_results=max_results)
-    return _fmt(trials)
+    trials = _raw_search_isrctn(query=query, max_results=max_results)
+    return {"result": _fmt_isrctn(trials)}
   
 @mcp.resource("info://aria")
 def aria_info() -> str:

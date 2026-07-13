@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1] - 2026-07-13
+### Changed
+- Consistency pass: all references to search_clinical_trials eligibility 
+  criteria (tool description, output_schema, docstring, server instructions 
+  block) now uniformly describe inclusion/exclusion as separate fields, 
+  matching actual v0.2.0 return behavior
+- TECHNICAL_REFERENCE.md corrected to match (two output_schema description 
+  mismatches from the v0.2.0 doc regeneration also fixed)
+
 ## [0.2.0] - 2026-07-12
 
 ### Breaking

@@ -28,7 +28,7 @@ mcp = FastMCP(
     instructions=(
         "ARIA provides real-time access to biomedical literature and clinical trials. "
         "Use search_pubmed for published research, mechanisms, drug studies, and outcomes. "
-        "Use search_clinical_trials for active or completed trials, eligibility criteria, and recruiting studies. "
+        "Use search_clinical_trials for active or completed trials, inclusion/exclusion criteria, and recruiting studies. "
         "Use search_isrctn for UK and European clinical trials not listed on ClinicalTrials.gov. "
         "Use all three together for comprehensive global clinical intelligence on any condition or intervention."
     ),
@@ -90,7 +90,7 @@ def search_pubmed(
         "Uses ClinicalTrials.gov v2 public API (no rate limit documented). "
         "Returns up to 10 results per call. No pagination. "
         "Returns 'No clinical trials found.' if no results match. "
-        "Use for: active trials, recruiting studies, eligibility criteria, "
+        "Use for: active trials, recruiting studies, inclusion/exclusion criteria, "
         "phase information, sponsor details, and trial locations."
     ),
     output_schema={
@@ -98,7 +98,7 @@ def search_pubmed(
         "properties": {
             "result": {
                 "type": "string",
-                "description": "Formatted list of trials with NCT ID, title, phase, status, sponsor, conditions, interventions, and eligibility criteria. Returns 'no results' message if nothing found."
+                "description": "Formatted list of trials with NCT ID, title, phase, status, sponsor, conditions, interventions, and eligibility criteria (inclusion and exclusion, listed separately). Returns 'no results' message if nothing found."
             }
         },
         "required": ["result"]
@@ -114,7 +114,7 @@ def search_clinical_trials(
     """
     Search ClinicalTrials.gov for clinical studies.
 
-    Use for: active trials, recruiting studies, trial eligibility criteria,
+    Use for: active trials, recruiting studies, inclusion/exclusion criteria,
     phase information, sponsor details, and trial locations.
 
     Args:
@@ -125,7 +125,7 @@ def search_clinical_trials(
     
     Returns:
         Formatted string with NCT ID, title, phase, status, sponsor, conditions,
-        interventions, and eligibility criteria for each trial.
+        interventions, and eligibility criteria (inclusion and exclusion, listed separately) for each trial.
         Returns a "no results" message if nothing is found.
         Handles API errors gracefully with descriptive error messages.
     

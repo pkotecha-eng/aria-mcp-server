@@ -1,1 +1,7 @@
 clean_test_env/
+.env
+.DS_Store
+__pycache__/
+*.pyc
+dist/
+.claude/settings.local.json

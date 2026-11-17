@@ -1,0 +1,25 @@
+{
+  "description": "Synthetic record for eval case c05. Not a real study. Exclusion criteria are cut at the 800-character cap exactly as the real tool cuts them; the original text continued with a mention of anticoagulant therapy that the agent cannot see.",
+  "search_clinical_trials": [
+    {
+      "nct_id": "NCT99999901",
+      "title": "Synthetic test record: oral therapy in adults with a chronic condition",
+      "status": "RECRUITING",
+      "phase": "PHASE3",
+      "conditions": "Synthetic condition",
+      "interventions": "Synthetic oral drug; Placebo",
+      "brief_summary": "Synthetic record used only to test how an assistant reads truncated eligibility text.",
+      "inclusion_criteria": "Adults aged 18 to 75 years; confirmed diagnosis; able to take oral medication.",
+      "exclusion_criteria": "Known hypersensitivity to the study drug or its excipients; pregnancy or breastfeeding; severe renal impairment (eGFR below 30 mL/min/1.73 m2); severe hepatic impairment (Child-Pugh class C); active malignancy within the past 5 years other than adequately treated non-melanoma skin cancer; uncontrolled hypertension (systolic above 180 mmHg or diastolic above 110 mmHg); myocardial infarction, stroke or unstable angina within the past 6 months; history of major bleeding or intracranial haemorrhage; platelet count below 100 x 10^9/L; participation in another interventional trial within 30 days; current or recent alcohol or substance use disorder; inability to provide informed consent; known HIV, hepatitis B or hepatitis C infection; QTc interval above 470 ms on screening ECG; concomitant us...",
+      "min_age": "18 Years",
+      "max_age": "75 Years",
+      "sex": "ALL",
+      "sponsor": "Synthetic Sponsor (test fixture)",
+      "start_date": "2026-01",
+      "locations": ["Example Hospital, Example City, Exampleland"],
+      "url": "https://clinicaltrials.gov/study/NCT99999901",
+      "primary_outcome": "Synthetic primary outcome",
+      "secondary_outcomes": "Synthetic secondary outcome"
+    }
+  ]
+}

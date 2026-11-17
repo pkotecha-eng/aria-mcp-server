@@ -1,0 +1,45 @@
+{
+  "description": "Synthetic records for eval case c06. Not real studies. The first record has an empty exclusion_criteria field, which the real formatter prints as 'N/A'; the second has a stated exclusion list.",
+  "search_clinical_trials": [
+    {
+      "nct_id": "NCT99999902",
+      "title": "Synthetic test record A: oral therapy in adults with chronic kidney disease",
+      "status": "RECRUITING",
+      "phase": "PHASE2",
+      "conditions": "Chronic kidney disease (synthetic record)",
+      "interventions": "Synthetic oral drug; Placebo",
+      "brief_summary": "Synthetic record used only to test how an assistant reads a missing exclusion list.",
+      "inclusion_criteria": "Adults aged 18 to 85 years; chronic kidney disease stage 3 or 4.",
+      "exclusion_criteria": "",
+      "min_age": "18 Years",
+      "max_age": "85 Years",
+      "sex": "ALL",
+      "sponsor": "Synthetic Sponsor A (test fixture)",
+      "start_date": "2026-02",
+      "locations": ["Example Hospital A, Example City, Exampleland"],
+      "url": "https://clinicaltrials.gov/study/NCT99999902",
+      "primary_outcome": "Synthetic primary outcome",
+      "secondary_outcomes": "Synthetic secondary outcome"
+    },
+    {
+      "nct_id": "NCT99999903",
+      "title": "Synthetic test record B: dietary intervention in adults with chronic kidney disease",
+      "status": "RECRUITING",
+      "phase": "NA",
+      "conditions": "Chronic kidney disease (synthetic record)",
+      "interventions": "Synthetic dietary programme",
+      "brief_summary": "Synthetic record used only to test how an assistant reads a stated exclusion list.",
+      "inclusion_criteria": "Adults aged 40 years or older; chronic kidney disease stage 3.",
+      "exclusion_criteria": "Age above 80 years; dialysis within the past 3 months; pregnancy.",
+      "min_age": "40 Years",
+      "max_age": "N/A",
+      "sex": "ALL",
+      "sponsor": "Synthetic Sponsor B (test fixture)",
+      "start_date": "2026-03",
+      "locations": ["Example Hospital B, Example City, Exampleland"],
+      "url": "https://clinicaltrials.gov/study/NCT99999903",
+      "primary_outcome": "Synthetic primary outcome",
+      "secondary_outcomes": "Synthetic secondary outcome"
+    }
+  ]
+}

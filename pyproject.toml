@@ -29,3 +29,13 @@ aria-mcp-server = "aria_mcp_server.server:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["aria_mcp_server"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/skills",
+    "/evals",
+    "/.claude-plugin",
+    "/.github",
+    "/.env",
+    "/dist",
+]

@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 dist/
 .claude/settings.local.json
+evals/results/

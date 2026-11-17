@@ -27,7 +27,7 @@ jobs:
           pip install pip-audit
           pip-audit -r requirements.txt
 
-      - name: Run tests (if any)
+      - name: Run tests
         run: |
           pip install pytest
-          pytest --tb=short -q || echo "No tests found"
+          pytest --tb=short -q

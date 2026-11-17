@@ -1,0 +1,20 @@
+{
+  "name": "aria",
+  "version": "0.1.0",
+  "displayName": "ARIA Clinical Research",
+  "description": "Clinical research MCP server (PubMed, ClinicalTrials.gov, ISRCTN) plus a skill that teaches agents when and how to use it.",
+  "author": {
+    "name": "Pooja Kotecha",
+    "url": "https://github.com/pkotecha-eng"
+  },
+  "homepage": "https://github.com/pkotecha-eng/aria-mcp-server",
+  "repository": "https://github.com/pkotecha-eng/aria-mcp-server",
+  "license": "MIT",
+  "keywords": ["clinical-research", "pubmed", "clinicaltrials", "isrctn", "mcp"],
+  "mcpServers": {
+    "aria-clinical-research": {
+      "command": "uvx",
+      "args": ["--from", "aria-mcp-server>=0.2.1", "aria-mcp-server"]
+    }
+  }
+}

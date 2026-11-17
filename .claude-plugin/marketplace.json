@@ -1,0 +1,14 @@
+{
+  "name": "pkotecha-eng",
+  "description": "ARIA clinical research MCP server and agent skill",
+  "owner": {
+    "name": "Pooja Kotecha"
+  },
+  "plugins": [
+    {
+      "name": "aria",
+      "source": "./",
+      "description": "PubMed, ClinicalTrials.gov and ISRCTN search tools plus a skill for evidence reviews and trial lookups."
+    }
+  ]
+}

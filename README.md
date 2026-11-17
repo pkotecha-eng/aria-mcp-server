@@ -45,6 +45,31 @@ pip install aria-mcp-server
 aria-mcp-server
 ```
 
+## Install as a Claude Code plugin
+
+The plugin bundles the MCP server with the `aria-clinical-research` skill, which teaches the agent when and how to use the tools. In Claude Code:
+
+```
+/plugin install aria --marketplace pkotecha-eng/aria-mcp-server
+```
+
+Claude Code first asks **Add marketplace?** (y/n), then a scope picker:
+
+- **Install for you (user scope)**
+- **Install for all collaborators on this repository (project scope)**
+- **Install for you, in this repo only (local scope)**
+
+To check the install:
+
+- `/plugin` shows **ARIA Clinical Research @ pkotecha-eng** with its scope, version, `Skills: aria-clinical-research` and `MCP servers: aria-clinical-research`. When a newer version is published, the same details screen offers **Update now**.
+- `/mcp` shows `plugin:aria:aria-clinical-research` as connected with 3 tools.
+
+The plugin starts the server with `uvx --from "aria-mcp-server>=0.2.2" aria-mcp-server`, so [uv](https://docs.astral.sh/uv/) must be on your `PATH`. Without `uv`, use the standalone server from the Quickstart instead (the plugin's skill is not installed that way).
+
+Run the plugin **or** a standalone `aria-mcp-server` entry in your MCP config, not both, or the tools appear twice.
+
+Tested on Claude Code 2.1.326. If `/plugin` is missing or behaves differently, run `which claude` and `claude --version` to make sure an older copy isn't shadowing the current one.
+
 ## Connect to Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -70,7 +95,7 @@ Restart Claude Desktop. The server will appear under Settings → Developer → 
 ## Tech stack
 
 - [FastMCP](https://gofastmcp.com) — MCP server framework
-- Python 3.12+
+- Python 3.10+
 
 ## Use cases
 
@@ -85,9 +110,11 @@ Restart Claude Desktop. The server will appear under Settings → Developer → 
 ```
 aria-mcp-server/          ← root, where mcp-publisher runs
 ├── aria_mcp_server/      ← Python package
-│   ├── __init__.py
 │   ├── server.py
 │   └── tools.py
+├── .claude-plugin/       ← Claude Code plugin + marketplace manifests
+├── skills/               ← aria-clinical-research agent skill
+├── evals/                ← eval harness
 ├── server.json           ← MCP registry metadata
 ├── pyproject.toml
 ├── README.md

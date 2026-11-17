@@ -1,6 +1,6 @@
 {
   "name": "aria",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "ARIA Clinical Research",
   "description": "Clinical research MCP server (PubMed, ClinicalTrials.gov, ISRCTN) plus a skill that teaches agents when and how to use it.",
   "author": {
@@ -14,7 +14,7 @@
   "mcpServers": {
     "aria-clinical-research": {
       "command": "uvx",
-      "args": ["--from", "aria-mcp-server>=0.2.1", "aria-mcp-server"]
+      "args": ["--from", "aria-mcp-server>=0.2.2", "aria-mcp-server"]
     }
   }
 }

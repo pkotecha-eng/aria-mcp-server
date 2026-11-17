@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- Claude Code plugin packaging (`.claude-plugin/plugin.json` and `marketplace.json`),
+  the `aria-clinical-research` agent skill, and an eval harness (`evals/`).
+- README section on installing as a Claude Code plugin.
+
+### Changed
+- Plugin version 0.1.1: the plugin now starts the server with `aria-mcp-server>=0.2.2`
+  (was `>=0.2.1`). Existing 0.1.0 installs get this on update.
+- sdist now excludes `skills/`, `evals/`, `.claude-plugin/`, `.github/`, `.env` and `dist/`.
+- README now says Python 3.10+, matching `requires-python = ">=3.10"`
+  (it previously said 3.12+).
+- CI job renamed from `security` to `ci`; it still runs pip-audit and the tests.
+  Any required status check named `security` must be updated.
+- CI test step no longer swallows failures (`|| echo` removed), so a failing test now fails the build.
+
 ## [0.2.2] - 2026-11-17
 ### Fixed
 - Tool descriptions for `search_clinical_trials` and `search_isrctn` now state the

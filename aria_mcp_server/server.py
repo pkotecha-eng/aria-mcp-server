@@ -89,7 +89,7 @@ def search_pubmed(
         "Read-only operation. No authentication required. "
         "Uses ClinicalTrials.gov v2 public API (no rate limit documented). "
         "Returns up to 10 results per call. No pagination. "
-        "Returns 'No clinical trials found.' if no results match. "
+        "Returns 'No clinical trials found matching those criteria.' if no results match. "
         "Use for: active trials, recruiting studies, inclusion/exclusion criteria, "
         "phase information, sponsor details, and trial locations."
     ),
@@ -151,7 +151,7 @@ def search_clinical_trials(
         "Complements ClinicalTrials.gov by covering trials at UK academic institutions "
         "and European research centers not listed on ClinicalTrials.gov. "
         "Returns up to 10 results per call, filtered for relevance. "
-        "Returns 'No ISRCTN trials found.' if no results match. "
+        "Returns 'No ISRCTN trials found matching those criteria.' if no results match. "
         "Use for: UK/European trials, academic institution studies, "
         "international coverage beyond ClinicalTrials.gov."
     ),

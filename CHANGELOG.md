@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.2] - 2026-11-17
+### Fixed
+- Tool descriptions for `search_clinical_trials` and `search_isrctn` now state the
+  empty-result messages the code actually returns ("No clinical trials found
+  matching those criteria." and "No ISRCTN trials found matching those criteria.");
+  previously the descriptions omitted "matching those criteria". Descriptions only.
+
+### Changed
+- Added package metadata (description, license, authors, keywords, project URLs)
+  so the PyPI page is complete. No behavior change.
+
 ## [0.2.1] - 2026-07-13
 ### Changed
 - Consistency pass: all references to search_clinical_trials eligibility 

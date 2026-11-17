@@ -1,18 +1,28 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "aria-mcp-server"
-version = "0.2.1"
+version = "0.2.2"
+description = "MCP server for clinical research: PubMed, ClinicalTrials.gov and ISRCTN search for AI agents"
 requires-python = ">=3.10"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Pooja Kotecha" }]
+keywords = ["mcp", "clinical-trials", "pubmed", "isrctn", "ai-agents"]
 dependencies = [
     "fastmcp>=3.2.4",
     "pydantic>=2.0",
     "requests>=2.31.0",
     "xmltodict>=0.14.2"
 ]
+
+[project.urls]
+Homepage = "https://github.com/pkotecha-eng/aria-mcp-server"
+Repository = "https://github.com/pkotecha-eng/aria-mcp-server"
+Issues = "https://github.com/pkotecha-eng/aria-mcp-server/issues"
 
 [project.scripts]
 aria-mcp-server = "aria_mcp_server.server:run"

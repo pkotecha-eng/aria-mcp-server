@@ -68,6 +68,10 @@ The plugin starts the server with `uvx --from "aria-mcp-server>=0.2.2" aria-mcp-
 
 Run the plugin **or** a standalone `aria-mcp-server` entry in your MCP config, not both, or the tools appear twice.
 
+### Updating
+
+Plugin updates are published as new plugin versions. To update, open `/plugin` → **Installed** → **ARIA Clinical Research** → **Update now**, then run `/reload-plugins`. No restart is needed. The details screen then shows the new version.
+
 Tested on Claude Code 2.1.326. If `/plugin` is missing or behaves differently, run `which claude` and `claude --version` to make sure an older copy isn't shadowing the current one.
 
 ## Connect to Claude Desktop

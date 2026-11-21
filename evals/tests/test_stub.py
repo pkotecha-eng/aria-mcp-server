@@ -11,7 +11,7 @@ from fastmcp import Client
 from pydantic import ValidationError
 
 import aria_mcp_server.server as real_server
-from aria_mcp_server.tools import format_trials_for_claude
+from aria_mcp_server.tools import SearchResult, Trial, format_trials_for_claude
 from evals.stub_server import (
     PATCHED_NAMES,
     Fixture,
@@ -66,7 +66,9 @@ def test_c05_exclusion_is_cut_at_cap_without_the_decisive_text() -> None:
 
 def test_c06_first_record_renders_exclusions_as_na() -> None:
     records = load_fixture(C06).search_clinical_trials
-    rendered = format_trials_for_claude([r.model_dump() for r in records])
+    rendered = format_trials_for_claude(
+        SearchResult[Trial](records=[Trial.model_validate(r.model_dump()) for r in records])
+    )
     assert "Exclusion Criteria: N/A" in rendered
     assert "Exclusion Criteria: Age above 80 years" in rendered
 
@@ -105,9 +107,9 @@ def test_patch_fails_closed_if_server_changes_shape(monkeypatch: pytest.MonkeyPa
 def test_trials_ignore_arguments_and_other_tools_return_nothing(patched: Path) -> None:
     a = real_server._raw_search_clinical_trials(condition="x", status="ALL", intervention="", max_results=1)
     b = real_server._raw_search_clinical_trials(condition="totally different")
-    assert a == b and a[0]["nct_id"] == "NCT99999901"
-    assert real_server._raw_search_pubmed(query="q", max_results=5) == []
-    assert real_server._raw_search_isrctn(query="q", max_results=5) == []
+    assert a == b and a.records[0].nct_id == "NCT99999901"
+    assert real_server._raw_search_pubmed(query="q", max_results=5).records == []
+    assert real_server._raw_search_isrctn(query="q", max_results=5).records == []
 
 
 def test_positional_call_is_rejected(patched: Path) -> None:

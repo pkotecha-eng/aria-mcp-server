@@ -3,9 +3,146 @@ Clinical research data tools for ARIA MCP Server.
 No API keys required — uses public NCBI and ClinicalTrials.gov APIs.
 """
 
+import logging
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar
+
 import requests
 import xmltodict
-from typing import Any
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+logger = logging.getLogger(__name__)
+
+
+# -------------------------------------------------------------------------
+# Validated record models
+#
+# Upstream payloads (xmltodict output, CT.gov JSON) are untyped and their schemas are
+# not ours, so they are not modelled field-for-field. Instead each upstream record is
+# validated into one of these strict models, which are what the rest of the code uses.
+# Only the identifier is required; every other field defaults to "" so the formatters
+# keep rendering a missing field as "N/A", exactly as before.
+# -------------------------------------------------------------------------
+
+
+class RecordParseError(ValueError):
+    """One upstream record could not be turned into a valid record model."""
+
+
+class UpstreamParseError(RuntimeError):
+    """An upstream response had records, but none of them could be parsed."""
+
+
+class _Record(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class Paper(_Record):
+    pmid: str = Field(min_length=1)
+    title: str = ""
+    authors: list[str] = Field(default_factory=list)
+    journal: str = ""
+    year: str = ""
+    abstract: str = ""
+    url: str = ""
+
+
+class Trial(_Record):
+    """One ClinicalTrials.gov record."""
+
+    nct_id: str = Field(min_length=1)
+    title: str = ""
+    status: str = ""
+    phase: str = ""
+    conditions: str = ""
+    interventions: str = ""
+    brief_summary: str = ""
+    inclusion_criteria: str = ""
+    exclusion_criteria: str = ""
+    min_age: str = ""
+    max_age: str = ""
+    sex: str = ""
+    sponsor: str = ""
+    start_date: str = ""
+    locations: list[str] = Field(default_factory=list)
+    url: str = ""
+    primary_outcome: str = ""
+    secondary_outcomes: str = ""
+
+
+class IsrctnTrial(_Record):
+    """One ISRCTN registry record."""
+
+    trial_id: str = Field(min_length=1)
+    title: str = ""
+    status: str = ""
+    phase: str = ""
+    sponsor: str = ""
+    condition: str = ""
+    primary_outcome: str = ""
+    secondary_outcomes: str = ""
+    countries: list[str] = Field(default_factory=list)
+    min_age: str = ""
+    max_age: str = ""
+    gender: str = ""
+    inclusion_criteria: str = ""
+    exclusion_criteria: str = ""
+    url: str = ""
+
+
+R = TypeVar("R", bound=_Record)
+
+
+class SearchResult(BaseModel, Generic[R]):
+    """Parsed records plus how many upstream records could not be parsed and were omitted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    records: list[R]
+    dropped: int = Field(default=0, ge=0)
+
+
+def _build(model: type[R], source: str, **fields: Any) -> R:
+    try:
+        return model(**fields)
+    except ValidationError as e:
+        raise RecordParseError(f"{source} record failed validation: {e}") from e
+
+
+def _parse_all(
+    source: str,
+    raw_items: list[Any],
+    parse: Callable[[Any], R],
+    expected: int | None = None,
+) -> SearchResult[R]:
+    """Parse every raw record. A record that fails is logged and counted, never silently lost.
+
+    `expected` is how many records the upstream said it was returning, when that is known
+    separately from `raw_items` (PubMed: esearch IDs vs. efetch articles). If there were
+    records to parse and none survived, raise, so a parse failure cannot read as "no results".
+    """
+    records: list[R] = []
+    for raw in raw_items:
+        try:
+            records.append(parse(raw))
+        except RecordParseError as e:
+            logger.warning("%s: omitting record: %s", source, e)
+    total = expected if expected is not None else len(raw_items)
+    dropped = total - len(records)
+    if dropped and not records:
+        raise UpstreamParseError(f"{source}: all {total} returned record(s) failed to parse")
+    return SearchResult(records=records, dropped=dropped)
+
+
+def _omitted_note(source: str, dropped: int) -> str:
+    if not dropped:
+        return ""
+    return f"Note: {dropped} {source} record(s) could not be parsed and were omitted; this list may be incomplete."
+
+
+def _with_note(body: str, source: str, dropped: int) -> str:
+    note = _omitted_note(source, dropped)
+    return f"{body}\n\n{note}" if note else body
 
 
 # -------------------------------------------------------------------------
@@ -44,15 +181,11 @@ def _extract_authors(author_list: Any) -> list[str]:
     return names
 
 
-def _parse_article(article_xml: dict) -> dict | None:
+def _parse_article(article_xml: dict) -> Paper:
     try:
         medline = article_xml.get("MedlineCitation") or article_xml
-        if not medline:
-            return None
         pmid_el = medline.get("PMID")
         pmid = _get_text(pmid_el) if isinstance(pmid_el, dict) else str(pmid_el or "").strip()
-        if not pmid:
-            return None
         article = (medline.get("Article") or {}) if isinstance(medline, dict) else {}
         if isinstance(article, str):
             article = {}
@@ -83,23 +216,25 @@ def _parse_article(article_xml: dict) -> dict | None:
             abstract = _get_text(abstract_el)
         if len(abstract) > 500:
             abstract = abstract[:497] + "..."
-        return {
-            "pmid": pmid,
-            "title": title,
-            "authors": authors,
-            "journal": journal,
-            "year": year,
-            "abstract": abstract,
-            "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-        }
-    except (KeyError, TypeError, AttributeError):
-        return None
+    except (KeyError, TypeError, AttributeError) as e:
+        raise RecordParseError(f"PubMed record could not be read ({type(e).__name__}: {e})") from e
+    return _build(
+        Paper,
+        "PubMed",
+        pmid=pmid,
+        title=title,
+        authors=authors,
+        journal=journal,
+        year=year,
+        abstract=abstract,
+        url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+    )
 
 
-def search_pubmed(query: str, max_results: int = 5) -> list[dict]:
+def search_pubmed(query: str, max_results: int = 5) -> SearchResult[Paper]:
     """Search PubMed via NCBI E-utilities. No API key required."""
     if not query or not query.strip():
-        return []
+        return SearchResult[Paper](records=[])
     query = query.strip()
     max_results = max(1, min(max_results, 100))
     try:
@@ -116,10 +251,10 @@ def search_pubmed(query: str, max_results: int = 5) -> list[dict]:
     id_list = (data.get("eSearchResult") or {}).get("IdList") or {}
     id_el = id_list.get("Id") if isinstance(id_list, dict) else None
     if not id_el:
-        return []
+        return SearchResult[Paper](records=[])
     pmids = [id_el] if isinstance(id_el, str) else list(id_el)[:max_results]
     if not pmids:
-        return []
+        return SearchResult[Paper](records=[])
 
     try:
         r2 = requests.get(
@@ -133,37 +268,37 @@ def search_pubmed(query: str, max_results: int = 5) -> list[dict]:
         raise RuntimeError(f"PubMed fetch failed: {e}") from e
 
     root = fetch_data.get("PubmedArticleSet") or fetch_data
-    articles = root.get("PubmedArticle") or root.get("PubmedData")
-    if not articles:
-        return []
+    articles = root.get("PubmedArticle") or root.get("PubmedData") or []
     if isinstance(articles, dict):
         articles = [articles]
-    return [p for p in (_parse_article(a) for a in articles) if p]
+    # esearch said len(pmids) articles exist; any that efetch did not return, or that fail
+    # to parse, are counted as dropped rather than vanishing.
+    return _parse_all("PubMed", articles, _parse_article, expected=len(pmids))
 
 
-def format_results_for_claude(results: list[dict]) -> str:
+def format_results_for_claude(result: SearchResult[Paper]) -> str:
     """Format PubMed results as readable text."""
-    if not results:
+    if not result.records:
         return "No papers found."
     lines = []
-    for i, paper in enumerate(results, 1):
-        authors_str = "; ".join(paper.get("authors") or [])
-        journal_year = paper.get("journal", "").strip()
-        year = paper.get("year", "").strip()
+    for i, paper in enumerate(result.records, 1):
+        authors_str = "; ".join(paper.authors)
+        journal_year = paper.journal.strip()
+        year = paper.year.strip()
         if journal_year and year:
             journal_year = f"{journal_year} ({year})"
         elif year:
             journal_year = year
         lines.append("\n".join([
             f"[Paper {i}]",
-            f"Title: {paper.get('title') or 'N/A'}",
+            f"Title: {paper.title or 'N/A'}",
             f"Authors: {authors_str or 'N/A'}",
             f"Journal/Year: {journal_year or 'N/A'}",
-            f"Abstract: {paper.get('abstract') or 'N/A'}",
-            f"URL: {paper.get('url') or 'N/A'}",
+            f"Abstract: {paper.abstract or 'N/A'}",
+            f"URL: {paper.url or 'N/A'}",
             "",
         ]))
-    return "\n".join(lines).strip()
+    return _with_note("\n".join(lines).strip(), "PubMed", result.dropped)
 
 
 # -------------------------------------------------------------------------
@@ -185,7 +320,7 @@ def _ct_get(d: Any, *keys, default: str = "") -> str:
     return str(d).strip()
 
 
-def _parse_trial(study: dict) -> dict | None:
+def _parse_trial(study: dict) -> Trial:
     try:
         proto = study.get("protocolSection") or {}
         id_mod = proto.get("identificationModule") or {}
@@ -213,8 +348,6 @@ def _parse_trial(study: dict) -> dict | None:
           secondary_outcome = secondary_outcome[:297] + "..."
 
         nct_id = _ct_get(id_mod, "nctId")
-        if not nct_id:
-            return None
 
         interventions = interventions_mod.get("interventions") or []
         intervention_names = "; ".join(
@@ -241,7 +374,7 @@ def _parse_trial(study: dict) -> dict | None:
         if len(summary) > 400:
             summary = summary[:397] + "..."
 
-        return {
+        fields = {
             "nct_id": nct_id,
             "title": _ct_get(id_mod, "briefTitle"),
             "status": _ct_get(status_mod, "overallStatus"),
@@ -261,8 +394,9 @@ def _parse_trial(study: dict) -> dict | None:
             "primary_outcome": primary_outcome,
             "secondary_outcomes": secondary_outcome,
         }
-    except (KeyError, TypeError, AttributeError):
-        return None
+    except (KeyError, TypeError, AttributeError) as e:
+        raise RecordParseError(f"ClinicalTrials.gov record could not be read ({type(e).__name__}: {e})") from e
+    return _build(Trial, "ClinicalTrials.gov", **fields)
 
 
 def search_clinical_trials(
@@ -270,11 +404,11 @@ def search_clinical_trials(
     status: str = "RECRUITING",
     intervention: str = "",
     max_results: int = 5,
-) -> list[dict]:
+) -> SearchResult[Trial]:
     """Search ClinicalTrials.gov v2 API. No API key required."""
     condition = (condition or "").strip()
     if not condition:
-        return []
+        return SearchResult[Trial](records=[])
     max_results = max(1, min(max_results, 20))
     params: dict[str, Any] = {
         "format": "json",
@@ -295,37 +429,37 @@ def search_clinical_trials(
         raise RuntimeError(f"ClinicalTrials.gov search failed: {e}") from e
 
     studies = data.get("studies") or []
-    return [t for t in (_parse_trial(s) for s in studies) if t]
+    return _parse_all("ClinicalTrials.gov", studies, _parse_trial)
 
 
-def format_trials_for_claude(trials: list[dict]) -> str:
+def format_trials_for_claude(result: SearchResult[Trial]) -> str:
     """Format ClinicalTrials.gov results as readable text."""
-    if not trials:
+    if not result.records:
         return "No clinical trials found matching those criteria."
     lines = []
-    for i, t in enumerate(trials, 1):
-        locations_str = "; ".join(t.get("locations") or []) or "N/A"
+    for i, t in enumerate(result.records, 1):
+        locations_str = "; ".join(t.locations) or "N/A"
         lines.append("\n".join([
             f"[Trial {i}]",
-            f"NCT ID: {t.get('nct_id') or 'N/A'}",
-            f"Title: {t.get('title') or 'N/A'}",
-            f"Status: {t.get('status') or 'N/A'}",
-            f"Phase: {t.get('phase') or 'N/A'}",
-            f"Condition(s): {t.get('conditions') or 'N/A'}",
-            f"Intervention(s): {t.get('interventions') or 'N/A'}",
-            f"Sponsor: {t.get('sponsor') or 'N/A'}",
-            f"Age Range: {t.get('min_age') or 'N/A'} – {t.get('max_age') or 'N/A'}",
-            f"Sex: {t.get('sex') or 'N/A'}",
+            f"NCT ID: {t.nct_id or 'N/A'}",
+            f"Title: {t.title or 'N/A'}",
+            f"Status: {t.status or 'N/A'}",
+            f"Phase: {t.phase or 'N/A'}",
+            f"Condition(s): {t.conditions or 'N/A'}",
+            f"Intervention(s): {t.interventions or 'N/A'}",
+            f"Sponsor: {t.sponsor or 'N/A'}",
+            f"Age Range: {t.min_age or 'N/A'} – {t.max_age or 'N/A'}",
+            f"Sex: {t.sex or 'N/A'}",
             f"Locations: {locations_str}",
-            f"Summary: {t.get('brief_summary') or 'N/A'}",
-            f"Primary Outcome: {t.get('primary_outcome') or 'N/A'}",
-            f"Secondary Outcomes: {t.get('secondary_outcomes') or 'N/A'}",
-            f"Inclusion Criteria: {t.get('inclusion_criteria') or 'N/A'}",
-            f"Exclusion Criteria: {t.get('exclusion_criteria') or 'N/A'}",
-            f"URL: {t.get('url') or 'N/A'}",
+            f"Summary: {t.brief_summary or 'N/A'}",
+            f"Primary Outcome: {t.primary_outcome or 'N/A'}",
+            f"Secondary Outcomes: {t.secondary_outcomes or 'N/A'}",
+            f"Inclusion Criteria: {t.inclusion_criteria or 'N/A'}",
+            f"Exclusion Criteria: {t.exclusion_criteria or 'N/A'}",
+            f"URL: {t.url or 'N/A'}",
             "",
         ]))
-    return "\n".join(lines).strip()
+    return _with_note("\n".join(lines).strip(), "ClinicalTrials.gov", result.dropped)
 
 
 # -------------------------------------------------------------------------
@@ -347,15 +481,13 @@ def _is_relevant_isrctn(trial: dict, query: str) -> bool:
       return True
     return any(word in searchable for word in significant_words)
 
-def _parse_isrctn_trial(trial: dict) -> dict | None:
+def _parse_isrctn_trial(trial: dict) -> IsrctnTrial:
     try:
         main = trial.get("main") or {}
         criteria = trial.get("criteria") or {}
         countries_el = trial.get("countries") or {}
 
         trial_id = _get_text(main.get("trial_id"))
-        if not trial_id:
-            return None
 
         # Handle countries — could be string or list
         country_raw = countries_el.get("country2")
@@ -372,13 +504,15 @@ def _parse_isrctn_trial(trial: dict) -> dict | None:
         exclusion_raw = _get_text(criteria.get("exclusion_criteria"))
         exclusion_criteria = exclusion_raw[:797] + "..." if len(exclusion_raw) > 800 else exclusion_raw
 
-        primary_outcome_raw = _get_text(trial.get("primary_outcome", {}).get("prim_outcome"))
+        # An empty <primary_outcome/> parses to None, not {}, so `.get(key, {})` would
+        # return None and the next `.get` would raise; `or {}` covers both.
+        primary_outcome_raw = _get_text((trial.get("primary_outcome") or {}).get("prim_outcome"))
         primary_outcome = primary_outcome_raw[:297] + "..." if len(primary_outcome_raw) > 300 else primary_outcome_raw
 
-        secondary_outcome_raw = _get_text(trial.get("secondary_outcome", {}).get("sec_outcome"))
+        secondary_outcome_raw = _get_text((trial.get("secondary_outcome") or {}).get("sec_outcome"))
         secondary_outcome = secondary_outcome_raw[:297] + "..." if len(secondary_outcome_raw) > 300 else secondary_outcome_raw
 
-        return {
+        fields = {
             "trial_id": trial_id,
             "title": _get_text(main.get("public_title")),
             "status": _get_text(main.get("recruitment_status")),
@@ -395,15 +529,16 @@ def _parse_isrctn_trial(trial: dict) -> dict | None:
             "exclusion_criteria": exclusion_criteria,
             "url": _get_text(main.get("url")),
         }
-    except (KeyError, TypeError, AttributeError):
-        return None
+    except (KeyError, TypeError, AttributeError) as e:
+        raise RecordParseError(f"ISRCTN record could not be read ({type(e).__name__}: {e})") from e
+    return _build(IsrctnTrial, "ISRCTN", **fields)
 
 
-def search_isrctn(query: str, max_results: int = 5) -> list[dict]:
+def search_isrctn(query: str, max_results: int = 5) -> SearchResult[IsrctnTrial]:
     """Search ISRCTN registry for UK/European clinical trials. No API key required."""
     query = (query or "").strip()
     if not query:
-        return []
+        return SearchResult[IsrctnTrial](records=[])
     max_results = max(1, min(max_results, 20))
     try:
         r = requests.get(
@@ -418,43 +553,45 @@ def search_isrctn(query: str, max_results: int = 5) -> list[dict]:
 
     trials_el = (data.get("trials") or {}).get("trial")
     if not trials_el:
-        return []
+        return SearchResult[IsrctnTrial](records=[])
     if isinstance(trials_el, dict):
         trials_el = [trials_el]
 
     relevant = [tr for tr in trials_el if _is_relevant_isrctn(tr, query)]
-    return [t for t in (_parse_isrctn_trial(tr) for tr in relevant) if t]
+    return _parse_all("ISRCTN", relevant, _parse_isrctn_trial)
 
 
-def format_isrctn_for_claude(trials: list[dict]) -> str:
+def format_isrctn_for_claude(result: SearchResult[IsrctnTrial]) -> str:
     """Format ISRCTN results as readable text."""
-    if not trials:
+    if not result.records:
         return "No ISRCTN trials found matching those criteria."
     lines = []
-    for i, t in enumerate(trials, 1):
-        countries_str = "; ".join(t.get("countries") or []) or "N/A"
+    for i, t in enumerate(result.records, 1):
+        countries_str = "; ".join(t.countries) or "N/A"
         lines.append("\n".join([
             f"[ISRCTN Trial {i}]",
-            f"ISRCTN ID: {t.get('trial_id') or 'N/A'}",
-            f"Title: {t.get('title') or 'N/A'}",
-            f"Status: {t.get('status') or 'N/A'}",
-            f"Phase: {t.get('phase') or 'N/A'}",
-            f"Condition: {t.get('condition') or 'N/A'}",
-            f"Primary Outcome: {t.get('primary_outcome') or 'N/A'}",
-            f"Secondary Outcomes: {t.get('secondary_outcomes') or 'N/A'}",
-            f"Sponsor: {t.get('sponsor') or 'N/A'}",
+            f"ISRCTN ID: {t.trial_id or 'N/A'}",
+            f"Title: {t.title or 'N/A'}",
+            f"Status: {t.status or 'N/A'}",
+            f"Phase: {t.phase or 'N/A'}",
+            f"Condition: {t.condition or 'N/A'}",
+            f"Primary Outcome: {t.primary_outcome or 'N/A'}",
+            f"Secondary Outcomes: {t.secondary_outcomes or 'N/A'}",
+            f"Sponsor: {t.sponsor or 'N/A'}",
             f"Countries: {countries_str}",
-            f"Age Range: {t.get('min_age') or 'N/A'} – {t.get('max_age') or 'N/A'}",
-            f"Gender: {t.get('gender') or 'N/A'}",
-            f"Inclusion Criteria: {t.get('inclusion_criteria') or 'N/A'}",
-            f"Exclusion Criteria: {t.get('exclusion_criteria') or 'N/A'}",
-            f"URL: {t.get('url') or 'N/A'}",
+            f"Age Range: {t.min_age or 'N/A'} – {t.max_age or 'N/A'}",
+            f"Gender: {t.gender or 'N/A'}",
+            f"Inclusion Criteria: {t.inclusion_criteria or 'N/A'}",
+            f"Exclusion Criteria: {t.exclusion_criteria or 'N/A'}",
+            f"URL: {t.url or 'N/A'}",
             "",
         ]))
-    return "\n".join(lines).strip()
+    return _with_note("\n".join(lines).strip(), "ISRCTN", result.dropped)
 
 __all__ = [
     "search_pubmed", "format_results_for_claude",
     "search_clinical_trials", "format_trials_for_claude",
     "search_isrctn", "format_isrctn_for_claude",
+    "Paper", "Trial", "IsrctnTrial", "SearchResult",
+    "RecordParseError", "UpstreamParseError",
 ]

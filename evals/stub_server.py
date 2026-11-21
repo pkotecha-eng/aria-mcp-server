@@ -26,6 +26,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 import aria_mcp_server.server as real_server
+from aria_mcp_server.tools import IsrctnTrial, Paper, SearchResult, Trial
 
 PATCHED_NAMES: tuple[str, ...] = (
     "_raw_search_pubmed",
@@ -89,21 +90,23 @@ def patch_server(fixture: Fixture, log_path: Path | None) -> None:
     missing = [n for n in PATCHED_NAMES if not hasattr(real_server, n)]
     if missing:
         raise StubConfigError(f"aria_mcp_server.server no longer defines {missing}; update the stub")
-    records = [r.model_dump() for r in fixture.search_clinical_trials]
+    # TrialRecord stays all-required (a fixture missing a field must fail to load); the
+    # real Trial model is what the formatters take, so convert once here.
+    records = [Trial.model_validate(r.model_dump()) for r in fixture.search_clinical_trials]
 
     # Keyword-only on purpose: the real wrappers call these by keyword, and a positional
     # call (the server changed) raises TypeError instead of being silently accepted.
-    def fake_trials(**kwargs: object) -> list[dict[str, object]]:
+    def fake_trials(**kwargs: object) -> SearchResult[Trial]:
         log_call(log_path, "search_clinical_trials", kwargs)
-        return [dict(r) for r in records]
+        return SearchResult[Trial](records=list(records))
 
-    def fake_pubmed(**kwargs: object) -> list[dict[str, object]]:
+    def fake_pubmed(**kwargs: object) -> SearchResult[Paper]:
         log_call(log_path, "search_pubmed", kwargs)
-        return []
+        return SearchResult[Paper](records=[])
 
-    def fake_isrctn(**kwargs: object) -> list[dict[str, object]]:
+    def fake_isrctn(**kwargs: object) -> SearchResult[IsrctnTrial]:
         log_call(log_path, "search_isrctn", kwargs)
-        return []
+        return SearchResult[IsrctnTrial](records=[])
 
     real_server._raw_search_clinical_trials = fake_trials  # type: ignore[attr-defined]
     real_server._raw_search_pubmed = fake_pubmed  # type: ignore[attr-defined]

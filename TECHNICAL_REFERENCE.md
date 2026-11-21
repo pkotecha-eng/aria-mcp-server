@@ -1,6 +1,6 @@
 # ARIA Clinical Research MCP Server — Technical Reference
 
-> **Version:** 0.2.1 · **Python:** ≥3.10 · **Transport:** stdio (default) or HTTP
+> **Version:** 0.3.0 · **Python:** ≥3.10 · **Transport:** stdio (default) or HTTP
 
 ---
 
@@ -380,6 +380,8 @@ Instructs the model to act as a clinical trial coordinator, search for recruitin
 
 `tools.py` contains all HTTP clients, XML/JSON parsers, and text formatters. It is **never exposed directly to the MCP protocol** — `server.py` is the only public surface. Its public names (`search_pubmed`, `search_clinical_trials`, `search_isrctn`, and their `format_*_for_claude` counterparts) are imported into `server.py` under `_raw_*`/`_fmt_*` aliases to avoid collisions with the identically-named `@mcp.tool` functions.
 
+Parsed records are validated into strict Pydantic models (`Paper`, `Trial`, `IsrctnTrial` — see [§10](#10-data-models)), and the `search_*` functions return a `SearchResult` holding the records plus a count of upstream records that could not be parsed. A parse failure is therefore counted and reported, never silently lost ([§11](#11-error-handling)).
+
 ### 9.1 PubMed Pipeline
 
 **Base URL:** `https://eutils.ncbi.nlm.nih.gov/entrez/eutils`
@@ -400,9 +402,9 @@ efetch.fcgi?db=pubmed&id=<comma-sep PMIDs>&rettype=xml
 |----------|-----------|---------|
 | `_get_text(node)` | `(Any) → str` | Safely extracts text from xmltodict string, dict with `#text` key, or other types |
 | `_extract_authors(author_list)` | `(Any) → list[str]` | Parses AuthorList dict into `["Last First", …]` strings |
-| `_parse_article(article_xml)` | `(dict) → dict \| None` | Extracts PMID, title, authors, journal, year, abstract (≤500 chars), URL from one PubmedArticle element |
-| `search_pubmed(query, max_results)` | `(str, int) → list[dict]` | Runs esearch + efetch; returns list of parsed article dicts |
-| `format_results_for_claude(results)` | `(list[dict]) → str` | Renders articles as numbered `[Paper N]` blocks |
+| `_parse_article(article_xml)` | `(dict) → Paper` | Extracts PMID, title, authors, journal, year, abstract (≤500 chars), URL from one PubmedArticle element; raises `RecordParseError` if the record cannot be read or has no PMID |
+| `search_pubmed(query, max_results)` | `(str, int) → SearchResult[Paper]` | Runs esearch + efetch; returns validated articles plus a `dropped` count (esearch IDs that efetch did not return or that failed to parse) |
+| `format_results_for_claude(result)` | `(SearchResult[Paper]) → str` | Renders articles as numbered `[Paper N]` blocks; appends a `Note:` line if any were dropped |
 
 **Abstract truncation:** abstracts are truncated to 500 characters (`abstract[:497] + "..."`), conditional on `len(abstract) > 500`.
 
@@ -419,9 +421,9 @@ efetch.fcgi?db=pubmed&id=<comma-sep PMIDs>&rettype=xml
 | Function | Signature | Purpose |
 |----------|-----------|---------|
 | `_ct_get(d, *keys, default="")` | `(Any, *str, str) → str` | Safely traverses nested dicts via a key path; joins lists with `"; "` |
-| `_parse_trial(study)` | `(dict) → dict \| None` | Extracts all fields from a `protocolSection` JSON object |
-| `search_clinical_trials(condition, status, intervention, max_results)` | `(str, str, str, int) → list[dict]` | Calls CT.gov v2 API; returns list of parsed trial dicts |
-| `format_trials_for_claude(trials)` | `(list[dict]) → str` | Renders trials as numbered `[Trial N]` blocks |
+| `_parse_trial(study)` | `(dict) → Trial` | Extracts all fields from a `protocolSection` JSON object; raises `RecordParseError` if the record cannot be read or has no NCT ID |
+| `search_clinical_trials(condition, status, intervention, max_results)` | `(str, str, str, int) → SearchResult[Trial]` | Calls CT.gov v2 API; returns validated trials plus a `dropped` count |
+| `format_trials_for_claude(result)` | `(SearchResult[Trial]) → str` | Renders trials as numbered `[Trial N]` blocks; appends a `Note:` line if any were dropped |
 
 **Modules parsed from `protocolSection`:**
 
@@ -470,9 +472,9 @@ This produces two separate dict fields, `inclusion_criteria` (≤600 chars) and 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
 | `_is_relevant_isrctn(trial, query)` | `(dict, str) → bool` | Post-fetch relevance filter — returns `True` if any query word >3 chars appears in `public_title` or `hc_freetext` |
-| `_parse_isrctn_trial(trial)` | `(dict) → dict \| None` | Extracts fields from a `trial` XML element |
-| `search_isrctn(query, max_results)` | `(str, int) → list[dict]` | Calls ISRCTN API, applies relevance filter, returns parsed trials |
-| `format_isrctn_for_claude(trials)` | `(list[dict]) → str` | Renders trials as numbered `[ISRCTN Trial N]` blocks |
+| `_parse_isrctn_trial(trial)` | `(dict) → IsrctnTrial` | Extracts fields from a `trial` XML element; raises `RecordParseError` if the record cannot be read or has no trial ID. An empty `<primary_outcome/>` / `<secondary_outcome/>` element is tolerated (parsed as empty text) |
+| `search_isrctn(query, max_results)` | `(str, int) → SearchResult[IsrctnTrial]` | Calls ISRCTN API, applies relevance filter, returns validated trials plus a `dropped` count |
+| `format_isrctn_for_claude(result)` | `(SearchResult[IsrctnTrial]) → str` | Renders trials as numbered `[ISRCTN Trial N]` blocks; appends a `Note:` line if any were dropped |
 
 **XML structure accessed:**
 
@@ -515,7 +517,9 @@ This produces two separate dict fields, `inclusion_criteria` (≤600 chars) and 
 
 ## 10. Data Models
 
-### PubMed article dict
+Each record is a frozen Pydantic v2 model with `extra="forbid"`. Only the identifier (`pmid`, `nct_id`, `trial_id`) is required, and it must be non-empty; every other field defaults to `""` (or `[]`), which the formatters render as `N/A`. The blocks below list each model's fields as `name: type` pairs.
+
+### PubMed article (`Paper`)
 
 ```python
 {
@@ -529,7 +533,7 @@ This produces two separate dict fields, `inclusion_criteria` (≤600 chars) and 
 }
 ```
 
-### ClinicalTrials.gov trial dict
+### ClinicalTrials.gov trial (`Trial`)
 
 ```python
 {
@@ -556,7 +560,7 @@ This produces two separate dict fields, `inclusion_criteria` (≤600 chars) and 
 
 > `eligibility_criteria` (single flat field, ≤600 chars, unconditional `"..."`) was **removed** in v0.2.0 and replaced by the `inclusion_criteria`/`exclusion_criteria` pair above.
 
-### ISRCTN trial dict
+### ISRCTN trial (`IsrctnTrial`)
 
 ```python
 {
@@ -580,6 +584,14 @@ This produces two separate dict fields, `inclusion_criteria` (≤600 chars) and 
 
 > `eligibility_criteria` (single combined field built from conditionally-appended `"Inclusion: …"`/`"Exclusion: …"` substrings, each hard-capped at 300 chars with an unconditional `"..."`) was **removed** in v0.2.0 and replaced by the `inclusion_criteria`/`exclusion_criteria` pair above — see [§9.3](#93-isrctn-pipeline) for the bug this fixes.
 
+### `SearchResult`
+
+```python
+SearchResult[R]:           # R is Paper, Trial or IsrctnTrial
+    records: list[R]       # successfully parsed and validated records
+    dropped: int           # upstream records that could not be parsed (>= 0)
+```
+
 ---
 
 ## 11. Error Handling
@@ -587,10 +599,12 @@ This produces two separate dict fields, `inclusion_criteria` (≤600 chars) and 
 Two layers of error handling now exist, in order:
 
 1. **MCP-layer input validation (new in v0.2.0).** Each `@mcp.tool` parameter is typed as `Annotated[type, Field(...)]` (or `Literal[...]` for `status`). FastMCP/Pydantic validates arguments against these constraints *before* the tool function body runs. Invalid input (empty `query`/`condition`, `max_results` outside 1–10, an unrecognized `status` value) raises a `pydantic.ValidationError`, surfaced to the MCP client as a `ToolError`. No clamping or silent correction happens at this layer.
-2. **`tools.py`-layer error handling (unchanged).** All three pipeline functions (`search_pubmed`, `search_clinical_trials`, `search_isrctn`) follow the same pattern:
+2. **`tools.py`-layer error handling.** All three pipeline functions (`search_pubmed`, `search_clinical_trials`, `search_isrctn`) follow the same pattern:
    - **HTTP errors / network timeouts** → re-raised as `RuntimeError` with a descriptive message, e.g. `"PubMed search failed: <original exception>"`. The MCP tool layer propagates this to the client as a tool error.
-   - **Missing / malformed fields** → individual record parsers (`_parse_article`, `_parse_trial`, `_parse_isrctn_trial`) catch `KeyError`, `TypeError`, `AttributeError` and return `None`. `None` records are filtered out silently.
-   - **Empty query** → `search_pubmed` and `search_isrctn` return `[]` immediately. `search_clinical_trials` returns `[]` if `condition` is empty. (In practice, the MCP-layer `min_length=1` constraint above now rejects empty strings before they ever reach these functions when called through the MCP tool surface; this guard remains relevant for direct callers of `tools.py`.)
+   - **Missing / malformed fields** → individual record parsers (`_parse_article`, `_parse_trial`, `_parse_isrctn_trial`) raise `RecordParseError` (a `ValueError`) when a field cannot be read (`KeyError`, `TypeError`, `AttributeError`) or the record fails model validation (e.g. no identifier). `_parse_all` logs each failure at WARNING, counts it in `SearchResult.dropped`, and carries on. The formatter then appends `Note: N <source> record(s) could not be parsed and were omitted; this list may be incomplete.` Nothing is dropped silently.
+   - **Every record failed to parse** → if the upstream returned records and none could be parsed, `UpstreamParseError` (a `RuntimeError`) is raised and surfaces to the client as a tool error, so a parse failure is never reported as "no results".
+   - **PubMed ID mismatch** → PMIDs returned by esearch but absent from the efetch response count as dropped; if esearch returned IDs and efetch returned no articles at all, `UpstreamParseError` is raised.
+   - **Empty query** → `search_pubmed` and `search_isrctn` return an empty `SearchResult` immediately. `search_clinical_trials` returns an empty `SearchResult` if `condition` is empty. (In practice, the MCP-layer `min_length=1` constraint above now rejects empty strings before they ever reach these functions when called through the MCP tool surface; this guard remains relevant for direct callers of `tools.py`.)
    - **Request timeouts:** all `requests.get` calls use `timeout=15` (esearch) or `timeout=20` (efetch).
 
 ---
@@ -636,11 +650,11 @@ Declared in `pyproject.toml`:
   "name": "io.github.pkotecha-eng/aria-mcp-server",
   "description": "Search 35M+ PubMed, 400K+ ClinicalTrials.gov & ISRCTN trials. Prompts included. No API key.",
   "repository": { "url": "https://github.com/pkotecha-eng/aria-mcp-server", "source": "github" },
-  "version": "0.2.0",
+  "version": "0.3.0",
   "packages": [{
     "registryType": "pypi",
     "identifier": "aria-mcp-server",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "transport": { "type": "stdio" }
   }]
 }
@@ -658,6 +672,7 @@ Declared in `pyproject.toml`:
 
 | Version | Date       | Changes                                                                                              |
 |---------|------------|--------------------------------------------------------------------------------------------------------|
+| 0.3.0   | 2026-11-21 | **Breaking (Python importers of `tools.py`):** `search_*` return `SearchResult[...]` instead of `list[dict]`; `format_*_for_claude` take it. MCP tool surface unchanged. **Fixed:** unparseable records are counted and reported via a `Note:` line instead of dropped silently, and the tool raises `UpstreamParseError` if every record fails; ISRCTN trials with an empty outcome element are kept. |
 | 0.2.0   | 2026-07-12 | **Breaking:** `eligibility_criteria` split into `inclusion_criteria`/`exclusion_criteria` on both trial tools; tool inputs validated via Pydantic (`max_results` 1–10, `status` enum, non-empty `query`/`condition`) — out-of-range values now rejected, not clamped. **Fixed:** `structured_content` (tools returned raw strings against a dict `output_schema`); ISRCTN exclusion criteria never reliably surfacing; ISRCTN outcome fields always appending `"..."` regardless of truncation; unmarked truncation on criteria fields. **Changed:** removed dead `max_results` clamp code in `server.py`; corrected stale docstrings; aliased `tools.py` imports at module level to fix a name-shadowing bug that forced per-call re-imports. **Removed:** unused `httpx` direct dependency. |
 | 0.1.9   | 2026-05-04 | ISRCTN relevance filter relaxed from `all()` to `any()` — improves recall for synonym-heavy conditions |
 | 0.1.8   | 2026-05-03 | Added `search_isrctn` tool; primary/secondary outcomes fields added to CT.gov + ISRCTN; relevance filtering |
@@ -688,9 +703,9 @@ Client sends:  search_pubmed(query="ketogenic diet pediatric epilepsy", max_resu
                       │  parse XML → IdList → ["39201234", "38901122", "38556789"]
                       │  GET eutils.../efetch.fcgi?db=pubmed&id=39201234,38901122,38556789
                       │  parse XML → PubmedArticleSet
-                      │  _parse_article(×3) → [dict, dict, dict]
+                      │  _parse_article(×3) → [Paper, Paper, Paper]  (wrapped in SearchResult)
                       │
-                      ▼ tools.format_results_for_claude([…])
+                      ▼ tools.format_results_for_claude(SearchResult(records=[…], dropped=0))
                       │  renders "[Paper 1]\nTitle: …\nAuthors: …\n…"
                       │
                       ▼ server.py wraps as {"result": "<formatted string>"}

@@ -2,7 +2,7 @@
 
 # 🧬 ARIA Clinical Research MCP Server
 A standalone MCP server that gives any Claude agent real-time access to biomedical literature and clinical trials — no API keys required.
-[![aria-mcp-server MCP server](https://glama.ai/mcp/servers/pkotecha-eng/aria-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/pkotecha-eng/aria-mcp-server)
+[![ARIA Clinical Research MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/pkotecha-eng/aria-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/pkotecha-eng/aria-mcp-server)
 ## Tools
 
 | Tool | Description |

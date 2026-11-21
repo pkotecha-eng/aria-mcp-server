@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aria-mcp-server"
-version = "0.2.2"
+version = "0.3.0"
 description = "MCP server for clinical research: PubMed, ClinicalTrials.gov and ISRCTN search for AI agents"
 requires-python = ">=3.10"
 readme = "README.md"

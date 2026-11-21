@@ -1,12 +1,21 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-11-21
 ### Added
 - Claude Code plugin packaging (`.claude-plugin/plugin.json` and `marketplace.json`),
   the `aria-clinical-research` agent skill, and an eval harness (`evals/`).
 - README section on installing as a Claude Code plugin.
+- Strict Pydantic models for parsed records (`Paper`, `Trial`, `IsrctnTrial`), a `SearchResult`
+  wrapper, and `RecordParseError` / `UpstreamParseError`, with offline tests in `tests/test_tools.py`.
 
 ### Changed
+- **Breaking for Python importers of `aria_mcp_server.tools`:** `search_pubmed`,
+  `search_clinical_trials` and `search_isrctn` now return `SearchResult[...]` (validated models in
+  `.records`, plus a `.dropped` count) instead of `list[dict]`, and the `format_*_for_claude`
+  functions take that type. MCP tool names, arguments and output format are unchanged, so
+  nothing changes for anyone using the server over MCP.
 - Plugin version 0.1.1: the plugin now starts the server with `aria-mcp-server>=0.2.2`
   (was `>=0.2.1`). Existing 0.1.0 installs get this on update.
 - sdist now excludes `skills/`, `evals/`, `.claude-plugin/`, `.github/`, `.env` and `dist/`.
@@ -15,6 +24,16 @@
 - CI job renamed from `security` to `ci`; it still runs pip-audit and the tests.
   Any required status check named `security` must be updated.
 - CI test step no longer swallows failures (`|| echo` removed), so a failing test now fails the build.
+
+### Fixed
+- Records that fail to parse are no longer dropped silently. They are logged and counted, and
+  results end with `Note: N <source> record(s) could not be parsed and were omitted; this list
+  may be incomplete.` If the upstream returned records and none could be parsed, the tool now
+  raises an error instead of reporting "no results".
+- PubMed articles listed by esearch but not returned by efetch are counted as omitted instead of
+  vanishing.
+- ISRCTN trials with an empty `<primary_outcome/>` or `<secondary_outcome/>` element were dropped
+  entirely; they are now kept.
 
 ## [0.2.2] - 2026-11-17
 ### Fixed
